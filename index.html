@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Beachonhouse Garden Town Recycling Machine</title>
 <style>
   body {
@@ -316,13 +318,13 @@
 </head>
 <body>
 
-<div class="header">
-  <div class="header-left">
-    <div class="credits" style="font-size: 12px; color: #666; margin-bottom: 4px;">Visual Representation Made by Abdul Rehman Goraya 9C RED</div>
-    <div class="brand">Beachonhouse Garden Town Recycling Machine</div>
+  <div class="header">
+    <div class="header-left">
+      <div class="credits" style="font-size: 12px; color: #666; margin-bottom: 4px;">Visual Representation Made by Abdul Rehman Goraya 9C RED</div>
+      <div class="brand">Beachonhouse Garden Town Recycling Machine</div>
+    </div>
+    <div class="subbrand">Reduce • Reuse • Recycle <button class="btn" id="adminBtn" type="button" style="margin-left:8px;">Admin</button></div>
   </div>
-  <div class="subbrand">Reduce • Reuse • Recycle</div>
-</div>
 
 <div class="layout">
 
@@ -397,6 +399,25 @@
       '12345678': { name: 'Abdul Rehman Goraya', class: '9C', section: 'RED', house: 'Leopards' }
     };
 
+    function loadStudents() {
+      var j = localStorage.getItem('students');
+      if (j) {
+        try { var parsed = JSON.parse(j); if (parsed && typeof parsed === 'object') return parsed; } catch(e) {}
+      }
+      return Object.assign({}, STUDENTS);
+    }
+    function saveStudents(map) {
+      try { localStorage.setItem('students', JSON.stringify(map)); } catch(e) {}
+    }
+    var studentsMap = loadStudents();
+
+    function getAdminPin() {
+      return localStorage.getItem('adminPin') || '0000';
+    }
+    function setAdminPin(pin) {
+      localStorage.setItem('adminPin', pin);
+    }
+
     function getPoints(id) {
       var v = localStorage.getItem('points:' + id);
       return v ? parseFloat(v) : 0;
@@ -437,7 +458,7 @@
     }
 
     function lookupStudent(id) {
-      return Object.prototype.hasOwnProperty.call(STUDENTS, id) ? STUDENTS[id] : null;
+      return Object.prototype.hasOwnProperty.call(studentsMap, id) ? studentsMap[id] : null;
     }
 
     function showStudentInfo() {
@@ -531,6 +552,181 @@
       document.getElementById('cancel').addEventListener('click', showMainMenu);
     }
 
+    function showAdminLogin() {
+      state = 'await_admin_pin';
+      buffer = '';
+      setDisplay('Enter Admin PIN then press #');
+    }
+
+    function showAdminMenu() {
+      state = 'admin_menu';
+      setDisplay(
+        '<div class="actions">' +
+          '<button class="btn" id="stats">View Machine Stats</button>' +
+          '<button class="btn" id="reset">Reset Machine Data</button>' +
+          '<button class="btn secondary" id="students">Manage Students</button>' +
+          '<button class="btn secondary" id="pin">Set Admin PIN</button>' +
+          '<button class="btn" id="exit">Exit Admin</button>' +
+        '</div>'
+      );
+      document.getElementById('stats').addEventListener('click', showAdminStats);
+      document.getElementById('reset').addEventListener('click', showAdminReset);
+      document.getElementById('students').addEventListener('click', showStudentManageMenu);
+      document.getElementById('pin').addEventListener('click', showSetAdminPin);
+      document.getElementById('exit').addEventListener('click', function(){ showPromptEnterId('Exiting Admin. Enter Student ID and press #'); });
+    }
+
+    function showAdminStats() {
+      state = 'admin_stats';
+      var plastic = getCount('plastic');
+      var paper = getCount('paper');
+      var metalC = getCount('metal');
+      var ids = Object.keys(studentsMap);
+      var totalStudents = ids.length;
+      var totalPoints = ids.reduce(function(sum, id){ return sum + getPoints(id); }, 0);
+      setDisplay(
+        '<div class="actions">' +
+          '<div>Plastic: ' + plastic + '</div>' +
+          '<div>Paper: ' + paper + '</div>' +
+          '<div>Metal: ' + metalC + '</div>' +
+          '<div>Students: ' + totalStudents + '</div>' +
+          '<div>Total Points: ' + totalPoints.toFixed(1) + '</div>' +
+          '<button class="btn" id="back">Back</button>' +
+        '</div>'
+      );
+      document.getElementById('back').addEventListener('click', showAdminMenu);
+    }
+
+    function showAdminReset() {
+      state = 'admin_reset';
+      setDisplay(
+        '<div class="actions">' +
+          '<button class="btn warn" id="resetCounts">Reset Bin Counters</button>' +
+          '<button class="btn warn" id="resetPoints">Reset All Student Points</button>' +
+          '<button class="btn warn" id="resetAll">Factory Reset (Counts, Points, Students)</button>' +
+          '<button class="btn" id="back">Back</button>' +
+        '</div>'
+      );
+      document.getElementById('back').addEventListener('click', showAdminMenu);
+      document.getElementById('resetCounts').addEventListener('click', function(){
+        setCount('plastic', 0); setCount('paper', 0); setCount('metal', 0); updateBinBadges();
+        setDisplay('<div class="actions"><div>Counters reset.</div><button class="btn" id="ok">OK</button></div>');
+        document.getElementById('ok').addEventListener('click', showAdminMenu);
+      });
+      document.getElementById('resetPoints').addEventListener('click', function(){
+        Object.keys(studentsMap).forEach(function(id){ setPoints(id, 0); });
+        setDisplay('<div class="actions"><div>All student points reset.</div><button class="btn" id="ok">OK</button></div>');
+        document.getElementById('ok').addEventListener('click', showAdminMenu);
+      });
+      document.getElementById('resetAll').addEventListener('click', function(){
+        if (window.confirm('Factory reset? This clears counts, all points, and restores default students.')) {
+          setCount('plastic', 0); setCount('paper', 0); setCount('metal', 0); updateBinBadges();
+          Object.keys(studentsMap).forEach(function(id){ setPoints(id, 0); });
+          studentsMap = Object.assign({}, STUDENTS); saveStudents(studentsMap);
+          setDisplay('<div class="actions"><div>Factory reset complete.</div><button class="btn" id="ok">OK</button></div>');
+          document.getElementById('ok').addEventListener('click', showAdminMenu);
+        }
+      });
+    }
+
+    function showStudentManageMenu() {
+      state = 'admin_students';
+      setDisplay(
+        '<div class="actions">' +
+          '<button class="btn" id="list">View Students</button>' +
+          '<button class="btn" id="add">Add Student</button>' +
+          '<button class="btn" id="remove">Remove Student</button>' +
+          '<button class="btn" id="resetOne">Reset Student Points</button>' +
+          '<button class="btn" id="back">Back</button>' +
+        '</div>'
+      );
+      document.getElementById('back').addEventListener('click', showAdminMenu);
+      document.getElementById('list').addEventListener('click', showStudentList);
+      document.getElementById('add').addEventListener('click', function(){
+        showAdminAddStudentId();
+      });
+      document.getElementById('remove').addEventListener('click', function(){
+        showAdminRemoveStudentId();
+      });
+      document.getElementById('resetOne').addEventListener('click', function(){
+        showAdminResetPointsById();
+      });
+    }
+
+    function showAdminResetPointsById() {
+      state = 'admin_reset_points_id';
+      buffer = '';
+      setDisplay('Enter Student ID to reset, then press #');
+    }
+
+    function showAdminAddStudentId() {
+      state = 'admin_add_student_id';
+      buffer = '';
+      setDisplay('Enter new Student ID, then press #');
+    }
+
+    function showAdminRemoveStudentId() {
+      state = 'admin_remove_student_id';
+      buffer = '';
+      setDisplay('Enter Student ID to remove, then press #');
+    }
+
+    function showAdminAddStudentDetails(newId) {
+      var name = window.prompt('Enter name'); if (!name) { showStudentManageMenu(); return; }
+      var cls = window.prompt('Enter class'); if (!cls) { showStudentManageMenu(); return; }
+      var sec = window.prompt('Enter section'); if (!sec) { showStudentManageMenu(); return; }
+      var house = window.prompt('Enter house'); if (!house) { showStudentManageMenu(); return; }
+      studentsMap[newId] = { name: name, class: cls, section: sec, house: house };
+      saveStudents(studentsMap);
+      setDisplay('<div class="actions"><div>Student added: ' + newId + '</div><button class="btn" id="ok">OK</button></div>');
+      document.getElementById('ok').addEventListener('click', showStudentManageMenu);
+    }
+
+    function showStudentList() {
+      state = 'admin_students_list';
+      var ids = Object.keys(studentsMap);
+      ids.sort();
+      var rows = ids.map(function(id){
+        var s = studentsMap[id];
+        var pts = getPoints(id).toFixed(1);
+        return '<tr><td style="padding:6px 8px; font-weight:600;">' + id + '</td>' +
+               '<td style="padding:6px 8px;">' + s.name + '</td>' +
+               '<td style="padding:6px 8px;">' + s.class + '-' + s.section + '</td>' +
+               '<td style="padding:6px 8px;">' + s.house + '</td>' +
+               '<td style="padding:6px 8px; text-align:right;">' + pts + '</td></tr>';
+      }).join('');
+      if (!rows) rows = '<tr><td colspan="5" style="padding:10px; text-align:center;">No students found</td></tr>';
+      setDisplay(
+        '<div class="actions" style="align-items:stretch;">' +
+          '<div style="font-weight:700; text-align:center; margin-bottom:6px;">Students</div>' +
+          '<div style="max-height:220px; overflow:auto; background:#fff; border:1px solid #c8d6e5; border-radius:10px; box-shadow:0 6px 14px rgba(0,0,0,0.08);">' +
+            '<table style="width:100%; border-collapse:collapse; font-size:14px;">' +
+              '<thead><tr style="background:#f5f8fb; text-align:left;">' +
+                '<th style="padding:8px;">ID</th>' +
+                '<th style="padding:8px;">Name</th>' +
+                '<th style="padding:8px;">Class-Section</th>' +
+                '<th style="padding:8px;">House</th>' +
+                '<th style="padding:8px; text-align:right;">Points</th>' +
+              '</tr></thead>' +
+              '<tbody>' + rows + '</tbody>' +
+            '</table>' +
+          '</div>' +
+          '<button class="btn" id="back">Back</button>' +
+        '</div>'
+      );
+      document.getElementById('back').addEventListener('click', showStudentManageMenu);
+    }
+
+    function showSetAdminPin() {
+      var a = window.prompt('Enter new Admin PIN');
+      if (!a) { showAdminMenu(); return; }
+      var b = window.prompt('Confirm new Admin PIN');
+      if (a !== b) { window.alert('PINs do not match.'); showAdminMenu(); return; }
+      setAdminPin(a);
+      setDisplay('<div class="actions"><div>Admin PIN updated.</div><button class="btn" id="ok">OK</button></div>');
+      document.getElementById('ok').addEventListener('click', showAdminMenu);
+    }
+
     // Keypad
     var buttons = document.querySelectorAll('.keypad button');
     buttons.forEach(function(btn) {
@@ -539,10 +735,63 @@
         if (key === '*') {
           buffer = '';
           if (state === 'await_id') setDisplay('Enter Student ID with keypad, then press #');
+          else if (state === 'admin_add_student_id') setDisplay('Enter new Student ID, then press #');
+          else if (state === 'admin_remove_student_id') setDisplay('Enter Student ID to remove, then press #');
+          else if (state === 'admin_reset_points_id') setDisplay('Enter Student ID to reset, then press #');
+          else if (state === 'await_admin_pin') setDisplay('Enter Admin PIN then press #');
           else display.textContent = 'Cleared';
           return;
         }
         if (key === '#') {
+          if (state === 'admin_add_student_id') {
+            if (!buffer) { setDisplay('Enter new Student ID, then press #'); return; }
+            if (studentsMap[buffer]) {
+              setDisplay('<div class="actions"><div>ID already exists.</div><button class="btn" id="retry">OK</button></div>');
+              document.getElementById('retry').addEventListener('click', function(){ showAdminAddStudentId(); });
+              buffer = '';
+              return;
+            }
+            var newId = buffer; buffer = '';
+            showAdminAddStudentDetails(newId);
+            return;
+          }
+          if (state === 'admin_remove_student_id') {
+            if (!buffer) { setDisplay('Enter Student ID to remove, then press #'); return; }
+            if (!studentsMap[buffer]) {
+              setDisplay('<div class="actions"><div>ID not found.</div><button class="btn" id="retry">OK</button></div>');
+              document.getElementById('retry').addEventListener('click', function(){ showAdminRemoveStudentId(); });
+              buffer = '';
+              return;
+            }
+            var delId = buffer; buffer = '';
+            delete studentsMap[delId]; saveStudents(studentsMap);
+            setDisplay('<div class="actions"><div>Student removed: ' + delId + '</div><button class="btn" id="ok">OK</button></div>');
+            document.getElementById('ok').addEventListener('click', showStudentManageMenu);
+            return;
+          }
+          if (state === 'admin_reset_points_id') {
+            if (!buffer) { setDisplay('Enter Student ID to reset, then press #'); return; }
+            var stu = lookupStudent(buffer);
+            if (!stu) {
+              setDisplay('<div class="actions"><div>ID not found.</div><button class="btn" id="retry">OK</button></div>');
+              document.getElementById('retry').addEventListener('click', function(){ showAdminResetPointsById(); });
+              buffer = '';
+              return;
+            }
+            setPoints(buffer, 0);
+            var doneId = buffer; buffer = '';
+            setDisplay('<div class="actions"><div>Points reset for: ' + doneId + '</div><button class="btn" id="ok">OK</button></div>');
+            document.getElementById('ok').addEventListener('click', showStudentManageMenu);
+            return;
+          }
+          if (state === 'await_admin_pin') {
+            if (!buffer) { setDisplay('Enter Admin PIN then press #'); return; }
+            if (buffer === getAdminPin()) { buffer=''; showAdminMenu(); return; }
+            setDisplay('<div class="actions"><div>Invalid PIN.</div><button class="btn" id="retry">OK</button></div>');
+            document.getElementById('retry').addEventListener('click', function(){ showAdminLogin(); });
+            buffer = '';
+            return;
+          }
           if (state === 'await_id') {
             if (!buffer) { setDisplay('Enter Student ID then press #'); return; }
             var candidate = lookupStudent(buffer);
@@ -646,5 +895,7 @@
     // Initialize
     showPromptEnterId();
     updateBinBadges();
+    var adminBtn = document.getElementById('adminBtn');
+    if (adminBtn) { adminBtn.addEventListener('click', showAdminLogin); }
   })();
 </script>
