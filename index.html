@@ -391,6 +391,7 @@
     var currentStudent = null;
     var pendingType = null;
     var draggingType = null;
+    var adminPinFirst = null;
 
     var STUDENTS = {
       '12345': { name: 'Ibrahim Jawad', class: '9C', section: 'RED', house: 'Dolphins' },
@@ -572,7 +573,7 @@
       document.getElementById('stats').addEventListener('click', showAdminStats);
       document.getElementById('reset').addEventListener('click', showAdminReset);
       document.getElementById('students').addEventListener('click', showStudentManageMenu);
-      document.getElementById('pin').addEventListener('click', showSetAdminPin);
+      document.getElementById('pin').addEventListener('click', showSetAdminPinNew);
       document.getElementById('exit').addEventListener('click', function(){ showPromptEnterId('Exiting Admin. Enter Student ID and press #'); });
     }
 
@@ -717,14 +718,18 @@
       document.getElementById('back').addEventListener('click', showStudentManageMenu);
     }
 
-    function showSetAdminPin() {
-      var a = window.prompt('Enter new Admin PIN');
-      if (!a) { showAdminMenu(); return; }
-      var b = window.prompt('Confirm new Admin PIN');
-      if (a !== b) { window.alert('PINs do not match.'); showAdminMenu(); return; }
-      setAdminPin(a);
-      setDisplay('<div class="actions"><div>Admin PIN updated.</div><button class="btn" id="ok">OK</button></div>');
-      document.getElementById('ok').addEventListener('click', showAdminMenu);
+    function showSetAdminPinNew() {
+      state = 'admin_set_pin_new';
+      buffer = '';
+      adminPinFirst = null;
+      setDisplay('Enter new Admin PIN then press #');
+    }
+
+    function showSetAdminPinConfirm(first) {
+      state = 'admin_set_pin_confirm';
+      buffer = '';
+      adminPinFirst = first;
+      setDisplay('Confirm Admin PIN then press #');
     }
 
     // Keypad
@@ -738,11 +743,34 @@
           else if (state === 'admin_add_student_id') setDisplay('Enter new Student ID, then press #');
           else if (state === 'admin_remove_student_id') setDisplay('Enter Student ID to remove, then press #');
           else if (state === 'admin_reset_points_id') setDisplay('Enter Student ID to reset, then press #');
+          else if (state === 'admin_set_pin_new') setDisplay('Enter new Admin PIN then press #');
+          else if (state === 'admin_set_pin_confirm') setDisplay('Confirm Admin PIN then press #');
           else if (state === 'await_admin_pin') setDisplay('Enter Admin PIN then press #');
           else display.textContent = 'Cleared';
           return;
         }
         if (key === '#') {
+          if (state === 'admin_set_pin_new') {
+            if (!buffer) { setDisplay('Enter new Admin PIN then press #'); return; }
+            var first = buffer; buffer = '';
+            showSetAdminPinConfirm(first);
+            return;
+          }
+          if (state === 'admin_set_pin_confirm') {
+            if (!buffer) { setDisplay('Confirm Admin PIN then press #'); return; }
+            var second = buffer; buffer = '';
+            if (adminPinFirst !== null && second === adminPinFirst) {
+              setAdminPin(second);
+              adminPinFirst = null;
+              setDisplay('<div class="actions"><div>Admin PIN updated.</div><button class="btn" id="ok">OK</button></div>');
+              document.getElementById('ok').addEventListener('click', showAdminMenu);
+            } else {
+              adminPinFirst = null;
+              setDisplay('<div class="actions"><div>PINs do not match.</div><button class="btn" id="retry">OK</button></div>');
+              document.getElementById('retry').addEventListener('click', function(){ showSetAdminPinNew(); });
+            }
+            return;
+          }
           if (state === 'admin_add_student_id') {
             if (!buffer) { setDisplay('Enter new Student ID, then press #'); return; }
             if (studentsMap[buffer]) {
